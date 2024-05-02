@@ -1,7 +1,7 @@
 use std::{iter::Peekable, slice::Iter};
 
 use crate::{
-    ast::{BinaryOp, Expr, LiteralValue, UnaryOp},
+    ast::{BinaryOp, Expr, LiteralValue, Stmt, UnaryOp},
     lexer::Token,
 };
 
@@ -10,6 +10,8 @@ pub enum ParseError {
     GenericError,
     ExpectedLiteral,
     ParenExpected,
+    ExpectedSemicolon,
+    ExpectedStatement,
 }
 
 pub struct Parser<'a> {
@@ -17,6 +19,10 @@ pub struct Parser<'a> {
 }
 
 /*
+* program       -> statement* EOF;
+* statement     -> exprStmt | printStmt;
+* exprStmt      -> expression ";";
+* printStmt     -> "print" expression ";";
 * expression    -> equality;
 * equality      -> comparison (("!=" | "==") comparison)*;
 * comparison    -> term ((">" | ">=" | "<" | "<=") term)*;
@@ -38,6 +44,7 @@ const FACTOR_TOKENS: &[Token] = &[Token::Star, Token::Slash];
 const UNARY_TOKENS: &[Token] = &[Token::Bang, Token::Minus];
 
 type E = Result<Expr, ParseError>;
+type S = Result<Stmt, ParseError>;
 
 impl<'a> Parser<'a> {
     pub fn new(tokens: &[Token]) -> Parser {
@@ -46,8 +53,28 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn parse(&mut self) -> E {
-        self.expression()
+    fn syncronize(&mut self) {
+        while let Some(&token) = self.tokens.peek() {
+            match token {
+                Token::Class
+                | Token::Else
+                | Token::Fun
+                | Token::For
+                | Token::If
+                | Token::Print
+                | Token::Var
+                | Token::While => {
+                    return;
+                }
+                Token::Semicolon => {
+                    let _ = self.consume();
+                    return;
+                }
+                _ => {
+                    let _ = self.consume();
+                }
+            }
+        }
     }
 
     fn consume(&mut self) -> Result<&Token, ParseError> {
@@ -64,19 +91,52 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn peek(&mut self) -> Result<&Token, ParseError> {
-        match self.tokens.peek() {
-            Some(token) => Ok(token),
-            None => Err(ParseError::GenericError),
-        }
-    }
-
     fn next_if_one_of(&mut self, tokens: &[Token]) -> Result<&Token, ParseError> {
         if let Some(token) = self.tokens.next_if(|&t| tokens.contains(t)) {
             return Ok(token);
         }
 
         Err(ParseError::GenericError)
+    }
+
+    fn next_if_eq(&mut self, token: Token) -> Option<&Token> {
+        match self.tokens.next_if(|&t| t == &token) {
+            Some(token) => Some(token),
+            None => None,
+        }
+    }
+
+    pub fn parse(&mut self) -> Result<Vec<Stmt>, Vec<ParseError>> {
+        let mut statements: Vec<Stmt> = vec![];
+        let mut errors: Vec<ParseError> = vec![];
+
+        while self.tokens.peek().is_some() {
+            match self.print_stmt() {
+                Ok(stmt) => statements.push(stmt),
+                Err(error) => {
+                    errors.push(error);
+                    self.syncronize();
+                }
+            }
+        }
+
+        if !errors.is_empty() {
+            return Err(errors);
+        }
+
+        Ok(statements)
+    }
+
+    fn print_stmt(&mut self) -> S {
+        match self.next_if_eq(Token::Print) {
+            Some(_) => {
+                let expr = self.expression()?;
+                self.consume_or_err(Token::Semicolon, ParseError::ExpectedSemicolon)?;
+
+                Ok(Stmt::Print(expr))
+            }
+            None => Err(ParseError::ExpectedStatement),
+        }
     }
 
     fn expression(&mut self) -> E {

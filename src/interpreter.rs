@@ -1,4 +1,4 @@
-use crate::ast::{BinaryOp, Expr, LiteralValue, UnaryOp};
+use crate::ast::{BinaryOp, Expr, LiteralValue, Stmt, UnaryOp};
 
 #[derive(Debug)]
 pub enum RuntimeError {
@@ -7,6 +7,7 @@ pub enum RuntimeError {
 }
 
 pub type EvalResult = Result<LiteralValue, RuntimeError>;
+pub type ExecResult = Result<(), RuntimeError>;
 
 pub struct Interpreter {}
 
@@ -15,7 +16,33 @@ impl Interpreter {
         Interpreter {}
     }
 
-    pub fn evaluate(&self, expr: Expr) -> EvalResult {
+    pub fn interpret(&self, statements: Vec<Stmt>) {
+        for stmt in statements {
+            match self.execute(stmt) {
+                Ok(_res) => {}
+                Err(_err) => {
+                    println!("Runtime Error!");
+                    return;
+                }
+            }
+        }
+    }
+
+    fn execute(&self, stmt: Stmt) -> ExecResult {
+        match stmt {
+            Stmt::Expr(expr) => {
+                self.evaluate(expr)?;
+                Ok(())
+            }
+            Stmt::Print(expr) => {
+                let res = self.evaluate(expr)?;
+                println!("{}", res);
+                Ok(())
+            }
+        }
+    }
+
+    fn evaluate(&self, expr: Expr) -> EvalResult {
         match expr {
             Expr::Binary { left, op, right } => self.binary(*left, op, *right),
             Expr::Unary { op, right } => self.unary(op, *right),

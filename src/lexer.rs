@@ -1,6 +1,6 @@
 use std::{iter::Peekable, str::Chars};
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug)]
 pub enum Token {
     // Single-char tokens
     LeftParen,
@@ -91,7 +91,6 @@ impl<'source> Scanner<'source> {
 
     pub fn scan_tokens(&mut self) {
         while self.scan_token().is_ok() {}
-        self.add_token(Token::EoF);
         println!("Tokens {:?}", self.tokens);
     }
 
