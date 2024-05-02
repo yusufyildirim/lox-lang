@@ -12,6 +12,7 @@ pub enum ParseError {
     ParenExpected,
     ExpectedSemicolon,
     ExpectedStatement,
+    ExpectedIdentifier,
 }
 
 pub struct Parser<'a> {
@@ -20,6 +21,8 @@ pub struct Parser<'a> {
 
 /*
 * program       -> statement* EOF;
+* declaration   -> varDecl | statement;
+* varDecl       -> "var" IDENTIFIER ("=" expression)?";";
 * statement     -> exprStmt | printStmt;
 * exprStmt      -> expression ";";
 * printStmt     -> "print" expression ";";
@@ -29,7 +32,7 @@ pub struct Parser<'a> {
 * term          -> factor (("+" | "-") factor)*;
 * factor        -> unary (("*" | "/") unary)*;
 * unary         -> ("!" | "-") unary | primary;
-* primary       -> NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")";
+* primary       -> NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" | IDENTIFIER;
 */
 
 const EQUALITY_TOKENS: &[Token] = &[Token::EqualEqual, Token::BangEqual];
@@ -110,7 +113,7 @@ impl<'a> Parser<'a> {
         let mut errors: Vec<ParseError> = vec![];
 
         while self.tokens.peek().is_some() {
-            match self.print_stmt() {
+            match self.declaration() {
                 Ok(stmt) => statements.push(stmt),
                 Err(error) => {
                     errors.push(error);
@@ -124,6 +127,36 @@ impl<'a> Parser<'a> {
         }
 
         Ok(statements)
+    }
+
+    fn declaration(&mut self) -> S {
+        match self.next_if_one_of(&[Token::Var]) {
+            Some(Token::Var) => self.var_decl(),
+            Some(_) | None => self.statement(),
+        }
+    }
+
+    fn var_decl(&mut self) -> S {
+        match self.tokens.next() {
+            Some(Token::Identifier(name)) => {
+                let mut initializer = None;
+
+                if self.next_if_eq(Token::Equal).is_some() {
+                    initializer = Some(Box::new(self.expression()?));
+                    self.consume_or_err(Token::Semicolon, ParseError::ExpectedSemicolon)?;
+                }
+
+                Ok(Stmt::VarDecl {
+                    name: name.clone(),
+                    initializer,
+                })
+            }
+            Some(_) | None => Err(ParseError::ExpectedIdentifier),
+        }
+    }
+
+    fn statement(&mut self) -> S {
+        self.print_stmt()
     }
 
     fn print_stmt(&mut self) -> S {
@@ -230,6 +263,7 @@ impl<'a> Parser<'a> {
                 self.consume_or_err(Token::RightParen, ParseError::ParenExpected)?;
                 Ok(expr)
             }
+            Token::Identifier(name) => Ok(Expr::Variable(name.clone())),
             _ => Err(ParseError::ExpectedLiteral),
         }
     }

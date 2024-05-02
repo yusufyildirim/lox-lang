@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use crate::lexer::Token;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum BinaryOp {
     Plus,
     Minus,
@@ -17,7 +17,7 @@ pub enum BinaryOp {
     BangEqual,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum UnaryOp {
     Minus,
     Bang,
@@ -82,7 +82,7 @@ impl TryFrom<&Token> for UnaryOp {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum LiteralValue {
     String(String),
     Number(f64),
@@ -101,7 +101,7 @@ impl Display for LiteralValue {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expr {
     Binary {
         left: Box<Expr>,
@@ -116,6 +116,7 @@ pub enum Expr {
 
     // Not sure about this
     Literal(LiteralValue),
+    Variable(String),
 }
 
 impl Display for Expr {
@@ -125,6 +126,7 @@ impl Display for Expr {
             Expr::Unary { op, right } => write!(f, "({} {})", op, right),
             Expr::Grouping(expr) => write!(f, "({})", expr),
             Expr::Literal(l) => write!(f, "{}", l),
+            Expr::Variable(name) => write!(f, "{}", name),
         }
     }
 }
@@ -133,4 +135,8 @@ impl Display for Expr {
 pub enum Stmt {
     Expr(Expr),
     Print(Expr),
+    VarDecl {
+        name: String,
+        initializer: Option<Box<Expr>>,
+    },
 }

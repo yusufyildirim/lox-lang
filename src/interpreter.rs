@@ -1,3 +1,5 @@
+use std::{collections::HashMap, ops::Deref};
+
 use crate::ast::{BinaryOp, Expr, LiteralValue, Stmt, UnaryOp};
 
 #[derive(Debug)]
@@ -9,14 +11,38 @@ pub enum RuntimeError {
 pub type EvalResult = Result<LiteralValue, RuntimeError>;
 pub type ExecResult = Result<(), RuntimeError>;
 
-pub struct Interpreter {}
+pub struct Environment {
+    vars: HashMap<String, LiteralValue>,
+}
+
+impl Environment {
+    pub fn new() -> Self {
+        Environment {
+            vars: HashMap::new(),
+        }
+    }
+
+    pub fn define(&mut self, key: String, value: LiteralValue) -> Option<LiteralValue> {
+        self.vars.insert(key, value)
+    }
+
+    pub fn get(&self, key: &str) -> Option<&LiteralValue> {
+        self.vars.get(key)
+    }
+}
+
+pub struct Interpreter {
+    environment: Environment,
+}
 
 impl Interpreter {
     pub fn new() -> Self {
-        Interpreter {}
+        Interpreter {
+            environment: Environment::new(),
+        }
     }
 
-    pub fn interpret(&self, statements: Vec<Stmt>) {
+    pub fn interpret(&mut self, statements: Vec<Stmt>) {
         for stmt in statements {
             match self.execute(stmt) {
                 Ok(_res) => {}
@@ -28,7 +54,7 @@ impl Interpreter {
         }
     }
 
-    fn execute(&self, stmt: Stmt) -> ExecResult {
+    fn execute(&mut self, stmt: Stmt) -> ExecResult {
         match stmt {
             Stmt::Expr(expr) => {
                 self.evaluate(expr)?;
@@ -37,6 +63,16 @@ impl Interpreter {
             Stmt::Print(expr) => {
                 let res = self.evaluate(expr)?;
                 println!("{}", res);
+                Ok(())
+            }
+            Stmt::VarDecl { name, initializer } => {
+                let mut value = LiteralValue::Nil;
+
+                if let Some(expr) = initializer {
+                    value = self.evaluate(expr.deref().clone())?;
+                }
+
+                self.environment.define(name, value);
                 Ok(())
             }
         }
@@ -48,6 +84,10 @@ impl Interpreter {
             Expr::Unary { op, right } => self.unary(op, *right),
             Expr::Grouping(expr) => self.evaluate(*expr),
             Expr::Literal(value) => Ok(value),
+            Expr::Variable(name) => match self.environment.get(&name) {
+                Some(value) => Ok(value.clone()),
+                None => todo!(),
+            },
         }
     }
 
