@@ -91,12 +91,11 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn next_if_one_of(&mut self, tokens: &[Token]) -> Result<&Token, ParseError> {
-        if let Some(token) = self.tokens.next_if(|&t| tokens.contains(t)) {
-            return Ok(token);
+    fn next_if_one_of(&mut self, tokens: &[Token]) -> Option<&Token> {
+        match self.tokens.next_if(|&t| tokens.contains(t)) {
+            Some(token) => Some(token),
+            None => None,
         }
-
-        Err(ParseError::GenericError)
     }
 
     fn next_if_eq(&mut self, token: Token) -> Option<&Token> {
@@ -145,7 +144,7 @@ impl<'a> Parser<'a> {
 
     fn equality(&mut self) -> E {
         let mut expr = self.comparison()?;
-        while let Ok(token) = self.next_if_one_of(EQUALITY_TOKENS) {
+        while let Some(token) = self.next_if_one_of(EQUALITY_TOKENS) {
             let op = BinaryOp::try_from(token).unwrap();
             let right = self.comparison()?;
             expr = Expr::Binary {
@@ -159,7 +158,7 @@ impl<'a> Parser<'a> {
     }
     fn comparison(&mut self) -> E {
         let mut expr = self.term()?;
-        while let Ok(token) = self.next_if_one_of(COMPARISON_TOKENS) {
+        while let Some(token) = self.next_if_one_of(COMPARISON_TOKENS) {
             let op = BinaryOp::try_from(token).unwrap();
             let right = self.term()?;
             expr = Expr::Binary {
@@ -174,7 +173,7 @@ impl<'a> Parser<'a> {
 
     fn term(&mut self) -> E {
         let mut expr = self.factor()?;
-        while let Ok(token) = self.next_if_one_of(TERM_TOKENS) {
+        while let Some(token) = self.next_if_one_of(TERM_TOKENS) {
             let op = BinaryOp::try_from(token).unwrap();
             let right = self.factor()?;
             expr = Expr::Binary {
@@ -189,7 +188,7 @@ impl<'a> Parser<'a> {
 
     fn factor(&mut self) -> E {
         let mut expr = self.unary()?;
-        while let Ok(token) = self.next_if_one_of(FACTOR_TOKENS) {
+        while let Some(token) = self.next_if_one_of(FACTOR_TOKENS) {
             let op = BinaryOp::try_from(token).unwrap();
             let right = self.unary()?;
 
@@ -204,7 +203,7 @@ impl<'a> Parser<'a> {
     }
 
     fn unary(&mut self) -> E {
-        if let Ok(token) = self.next_if_one_of(UNARY_TOKENS) {
+        if let Some(token) = self.next_if_one_of(UNARY_TOKENS) {
             let op = UnaryOp::try_from(token).unwrap();
             let right = self.unary()?;
 
